@@ -15,6 +15,7 @@ import signal
 from main.evaluate import evaluate
 from rca.api_router import configs
 from rca.custom_agent.agent import CustomAgent
+import rca.baseline.rca_agent.prompt.agent_prompt as ap
 
 
 def handler(signum, frame):
@@ -80,7 +81,7 @@ def main(args, uid, dataset):
             try:
                 signal.alarm(args.timeout)
 
-                agent = CustomAgent(bp)
+                agent = CustomAgent(ap, bp)
                 result = agent.run(
                     instruction,
                     logger,
