@@ -131,6 +131,26 @@ python -m rca.run_agent_standard --dataset Market/cloudbed-2
 
 The generated results and monitor files can be found in a new `test` directory created after running any test script.
 
+### 🧪 Custom Agent（自訂代理）基準測試（繁體中文）
+
+如果你想用自己的規劃方法 + prompt + tool 來測試 OpenRCA 的 Benchmark，可以使用本專案新增的自訂代理執行器：
+
+```bash
+python -m rca.run_custom_agent --dataset Bank
+```
+
+常見參數：
+
+- `--dataset`：資料集名稱（Telecom、Bank、Market/cloudbed-1、Market/cloudbed-2）
+- `--start_idx` / `--end_idx`：控制從哪一筆題目開始/結束
+- `--controller_max_step`：最多呼叫模型幾輪（預設 10）
+- `--timeout`：單題的最大執行秒數
+- `--tag`：結果檔案 tag
+
+執行後會在 `test/result/...` 產生對應的 CSV，格式與 OpenRCA 的 `evaluate` 相容，並且會在 `test/monitor/...` 留下 prompt/trajectory 以便除錯與檢視。
+
+> 若要調整工具或 prompt，可以修改 `rca/custom_agent/agent.py`（system prompt 與流程）與 `rca/custom_agent/tools.py`（工具定義）。
+
 ### 💽 Reconstruction
 
 You can generate new task for OpenRCA telemetry or your own privacy telemetry by modifying `main/task_specification.json` and run the following command:
