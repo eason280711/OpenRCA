@@ -32,42 +32,105 @@ def list_files(directory: str) -> str:
     return json.dumps({"directory": str(directory), "files": files})
 
 
-def read_file(file_path: str) -> str:
-    """Read a text file and return its content."""
+def read_file(file_path: str, start_line: int = 1, max_lines: int = 200) -> str:
+    """Read a slice of a text file and return JSON."""
     target = _resolve_path(file_path)
     if not target.exists():
-        return f"ERROR: File not found: {file_path}"
+        return json.dumps({"error": f"File not found: {file_path}", "lines": []})
     if target.is_dir():
-        return f"ERROR: Path is a directory: {file_path}"
-    return target.read_text(encoding="utf-8", errors="replace")
+        return json.dumps({"error": f"Path is a directory: {file_path}", "lines": []})
+
+    if start_line < 1:
+        return json.dumps({"error": "start_line must be >= 1", "lines": []})
+    if max_lines < 1:
+        return json.dumps({"error": "max_lines must be >= 1", "lines": []})
+
+    lines = []
+    end_line = start_line - 1
+    with target.open("r", encoding="utf-8", errors="replace") as handle:
+        for line_no, line in enumerate(handle, start=1):
+            if line_no < start_line:
+                continue
+            lines.append(line.rstrip("\n"))
+            end_line = line_no
+            if len(lines) >= max_lines:
+                break
+
+    return json.dumps(
+        {
+            "file_path": file_path,
+            "start_line": start_line,
+            "end_line": end_line,
+            "lines": lines,
+            "truncated": len(lines) >= max_lines,
+        }
+    )
 
 
-def grep_log(log_file: str, keyword: str, context_lines: int = 2) -> str:
+def grep_log(
+    log_file: str,
+    keyword: str,
+    context_lines: int = 2,
+    max_matches: int = 15,
+) -> str:
     """Search keyword in a log file and return JSON context."""
-    content = read_file(log_file)
-    if content.startswith("ERROR:"):
-        return json.dumps({"error": content, "matches": []})
+    target = _resolve_path(log_file)
+    if not target.exists():
+        return json.dumps({"error": f"File not found: {log_file}", "matches": []})
+    if target.is_dir():
+        return json.dumps({"error": f"Path is a directory: {log_file}", "matches": []})
+    if context_lines < 0:
+        return json.dumps({"error": "context_lines must be >= 0", "matches": []})
 
-    lines = content.split("\n")
     matches = []
+    pending = []
+    keyword_lower = keyword.lower()
+    before_buffer = []
 
-    for i, line in enumerate(lines):
-        if keyword.lower() in line.lower():
-            start = max(0, i - context_lines)
-            end = min(len(lines), i + context_lines + 1)
-            matches.append(
-                {
-                    "line_number": i + 1,
-                    "context": lines[start:end],
-                    "matched_line": line,
-                }
-            )
+    with target.open("r", encoding="utf-8", errors="replace") as handle:
+        for line_no, line in enumerate(handle, start=1):
+            stripped = line.rstrip("\n")
+            if keyword_lower in stripped.lower():
+                context = before_buffer + [stripped]
+                pending.append(
+                    {
+                        "line_number": line_no,
+                        "context": context,
+                        "matched_line": stripped,
+                        "remaining": context_lines,
+                    }
+                )
+
+            for match in list(pending):
+                if match["remaining"] > 0 and match["line_number"] != line_no:
+                    match["context"].append(stripped)
+                    match["remaining"] -= 1
+                if match["remaining"] == 0:
+                    matches.append(
+                        {
+                            "line_number": match["line_number"],
+                            "context": match["context"],
+                            "matched_line": match["matched_line"],
+                        }
+                    )
+                    pending.remove(match)
+                    if len(matches) >= max_matches:
+                        pending.clear()
+                        break
+
+            if len(matches) >= max_matches:
+                break
+
+            before_buffer.append(stripped)
+            if len(before_buffer) > context_lines:
+                before_buffer.pop(0)
 
     return json.dumps(
         {
             "keyword": keyword,
             "total_matches": len(matches),
-            "matches": matches[:15],
+            "matches": matches,
+            "truncated": len(matches) >= max_matches,
         }
     )
 

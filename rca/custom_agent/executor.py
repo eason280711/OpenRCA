@@ -27,7 +27,8 @@ rule = """## RULES OF TOOL USAGE:
 1. Only call the tools that are explicitly listed in the format.
 2. Keep each tool call atomic. Request only one tool per step.
 3. Use the telemetry schema to decide which files or logs to inspect.
-4. Never fabricate file contents. Always rely on tool outputs."""
+4. Read files in small slices using read_file(start_line=..., max_lines=...). Never request whole-file reads.
+5. Never fabricate file contents. Always rely on tool outputs."""
 
 
 def _extract_json(text: str) -> tuple[dict | None, str]:
